@@ -329,3 +329,37 @@ export async function syncFromMagma(actor = "system") {
     bmkg: bmkgMeta,
   };
 }
+
+/** Sync otomatis jika data lebih tua dari maxAgeMs (default 2 menit). */
+let syncInFlight: Promise<{
+  synced_at: string;
+  volcano_count: number;
+  levels_found: number;
+  bmkg: { closed_count: number; va_count: number; stations: number };
+  skipped?: boolean;
+}> | null = null;
+
+export async function syncIfStale(maxAgeMs = 120_000, actor = "auto-open") {
+  const store = await ensureStore();
+  const last = store.last_sync_at ? Date.parse(store.last_sync_at) : 0;
+  if (last && Date.now() - last < maxAgeMs) {
+    return {
+      synced_at: store.last_sync_at!,
+      volcano_count: store.volcanoes.length,
+      levels_found: 0,
+      bmkg: {
+        closed_count: (store.airports ?? []).filter((a) => a.closed).length,
+        va_count: (store.airports ?? []).filter((a) => a.has_va).length,
+        stations: (store.airports ?? []).length,
+      },
+      skipped: true,
+    };
+  }
+
+  if (!syncInFlight) {
+    syncInFlight = syncFromMagma(actor).finally(() => {
+      syncInFlight = null;
+    });
+  }
+  return syncInFlight;
+}

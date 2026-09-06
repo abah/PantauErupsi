@@ -27,6 +27,7 @@ export function MapShell() {
   const [focusAirportIcao, setFocusAirportIcao] = useState<string | null>(null);
   const [lastSync, setLastSync] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [queryText, setQueryText] = useState("");
   const [filters, setFilters] = useState<Filters>({
     minLevel: 1,
@@ -70,6 +71,27 @@ export function MapShell() {
     } catch {
       /* keep previous */
     }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setRefreshing(true);
+      try {
+        const res = await fetch("/api/refresh");
+        const data = await res.json();
+        if (!cancelled && data.synced_at) setLastSync(data.synced_at);
+      } catch {
+        /* tetap tampilkan cache */
+      } finally {
+        if (!cancelled) setRefreshing(false);
+      }
+      if (!cancelled) await Promise.all([loadVolcanoes(), loadAirports()]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sekali saat app dibuka
   }, []);
 
   useEffect(() => {
@@ -318,9 +340,11 @@ export function MapShell() {
             </>
           )}
           <span className="w-full text-[10px] opacity-70">
-            {lastSync
-              ? `Sync ${new Date(lastSync).toLocaleString("id-ID")} · `
-              : ""}
+            {refreshing
+              ? "Memperbarui data resmi MAGMA + BMKG…"
+              : lastSync
+                ? `Sync ${new Date(lastSync).toLocaleString("id-ID")} · `
+                : ""}
           </span>
           <SourcesAttribution compact />
         </div>
