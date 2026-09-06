@@ -1,0 +1,26 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pantau-erupsi",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-03-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "pantau-erupsi"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "PANTAU_STORE",
+      "id": "a33711e7fa604f49b953bb6ce010623c"
+    }
+  ],
+  "vars": {
+    "NEXT_PUBLIC_SITE_URL": "https://pantau-erupsi.abah.workers.dev"
+  }
+}
