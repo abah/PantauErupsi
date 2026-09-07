@@ -6,6 +6,7 @@ type Camera = {
   id: string;
   label: string;
   image_url: string | null;
+  snap_url?: string | null;
   has_image?: boolean;
 };
 
@@ -20,25 +21,31 @@ export function CctvGallery({
 }) {
   const [cameras, setCameras] = useState<Camera[]>([]);
   const [loading, setLoading] = useState(true);
+  const [snapLoading, setSnapLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [available, setAvailable] = useState(true);
   const [magmaUrl, setMagmaUrl] = useState(fallbackMagmaUrl);
   const [selected, setSelected] = useState(0);
+  const [activeImage, setActiveImage] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
     setNote(null);
+    setActiveImage(null);
+    setSelected(0);
     fetch(`/api/cctv/${encodeURIComponent(code)}`)
       .then(async (r) => {
         const data = await r.json();
-        if (!r.ok) throw new Error(data.error || "Gagal memuat CCTV");
         if (!cancelled) {
           setCameras(data.cameras ?? []);
           setNote(data.note ?? null);
+          setAvailable(data.available !== false);
           if (data.magma_url) setMagmaUrl(data.magma_url);
-          setSelected(0);
+          const first = (data.cameras ?? [])[0];
+          if (first?.image_url) setActiveImage(first.image_url);
         }
       })
       .catch((e) => {
@@ -52,12 +59,54 @@ export function CctvGallery({
     };
   }, [code]);
 
+  const selectedId = cameras[selected]?.id;
+  const selectedSnap = cameras[selected]?.snap_url;
+  const selectedCached = cameras[selected]?.image_url;
+
+  useEffect(() => {
+    if (selectedCached) {
+      setActiveImage(selectedCached);
+      return;
+    }
+    if (!selectedSnap || !selectedId) {
+      setActiveImage(null);
+      return;
+    }
+
+    let cancelled = false;
+    setSnapLoading(true);
+    fetch(selectedSnap)
+      .then(async (r) => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || "Snapshot gagal");
+        if (!cancelled) {
+          setActiveImage(data.image_url ?? null);
+          setCameras((prev) =>
+            prev.map((c) =>
+              c.id === selectedId
+                ? { ...c, image_url: data.image_url ?? null, has_image: true }
+                : c,
+            ),
+          );
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setActiveImage(null);
+      })
+      .finally(() => {
+        if (!cancelled) setSnapLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedId, selectedSnap, selectedCached]);
+
   if (loading) {
     return (
       <div className="space-y-3">
         <div className="h-44 animate-pulse rounded border border-[var(--line)] bg-[var(--panel-2)]" />
         <p className="text-sm text-[var(--muted)]">
-          Mengambil snapshot dari MAGMA…
+          Mengambil kamera dari MAGMA…
         </p>
       </div>
     );
@@ -71,22 +120,19 @@ export function CctvGallery({
     );
   }
 
-  const active = cameras[selected];
-  const hasAnyImage = cameras.some((c) => c.image_url);
-
   return (
     <div className="space-y-3">
-      {hasAnyImage && active?.image_url ? (
+      {activeImage ? (
         <div className="overflow-hidden rounded border border-[var(--line)] bg-black">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={active.image_url}
-            alt={active.label || volcanoName || "CCTV"}
+            src={activeImage}
+            alt={cameras[selected]?.label || volcanoName || "CCTV"}
             className="max-h-64 w-full object-contain"
           />
           <div className="flex items-center justify-between gap-2 border-t border-[var(--line)] bg-[var(--panel-2)] px-3 py-2">
             <p className="truncate text-xs text-[var(--ink-soft)]">
-              {active.label}
+              {cameras[selected]?.label}
             </p>
             <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--ember)]">
               Snapshot MAGMA
@@ -95,19 +141,28 @@ export function CctvGallery({
         </div>
       ) : (
         <div className="rounded border border-[var(--line)] bg-[var(--panel-2)] px-4 py-5 text-center">
-          <p className="text-sm text-[var(--ink-soft)]">
-            {note ||
-              `Snapshot CCTV tidak tersedia untuk ${volcanoName || "gunung ini"}.`}
-          </p>
-          <p className="mt-2 text-[11px] text-[var(--muted)]">
-            Saat ini MAGMA mempublikasikan CCTV untuk: Anak Krakatau, Bromo,
-            Dempo, Dieng, Guntur, Ibu, Ijen, Kerinci, Papandayan, Semeru,
-            Sinabung.
-          </p>
+          {snapLoading ? (
+            <p className="text-sm text-[var(--muted)]">Memuat snapshot…</p>
+          ) : (
+            <>
+              <p className="text-sm text-[var(--ink-soft)]">
+                {note ||
+                  (available
+                    ? `Snapshot ${volcanoName || "gunung ini"} sedang tidak bisa diambil dari MAGMA.`
+                    : `MAGMA belum mempublikasikan CCTV live untuk ${volcanoName || "gunung ini"}.`)}
+              </p>
+              {!available && (
+                <p className="mt-2 text-[11px] text-[var(--muted)]">
+                  CCTV MAGMA saat ini: Anak Krakatau, Bromo, Dempo, Dieng,
+                  Guntur, Ibu, Ijen, Kerinci, Papandayan, Semeru, Sinabung.
+                </p>
+              )}
+            </>
+          )}
         </div>
       )}
 
-      {cameras.length > 1 && hasAnyImage && (
+      {cameras.length > 1 && (
         <div className="flex flex-wrap gap-1.5">
           {cameras.map((cam, idx) => (
             <button
