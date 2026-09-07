@@ -116,5 +116,13 @@ a {
   border-radius: 3px;
   white-space: nowrap;
   pointer-events: none;
-  transform: translateY(-18px);
+  transform: translateY(-2px);
+}
+
+.pe-airport-marker {
+  pointer-events: auto !important;
+}
+
+.maplibregl-marker {
+  z-index: 2;
 }
