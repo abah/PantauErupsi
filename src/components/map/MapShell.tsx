@@ -74,6 +74,10 @@ export function MapShell() {
   }, []);
 
   useEffect(() => {
+    // Langsung tampilkan data; refresh berjalan di belakang
+    void loadVolcanoes();
+    void loadAirports();
+
     let cancelled = false;
     (async () => {
       setRefreshing(true);
@@ -81,17 +85,19 @@ export function MapShell() {
         const res = await fetch("/api/refresh");
         const data = await res.json();
         if (!cancelled && data.synced_at) setLastSync(data.synced_at);
+        if (!cancelled) {
+          await Promise.all([loadVolcanoes(), loadAirports()]);
+        }
       } catch {
-        /* tetap tampilkan cache */
+        /* tetap pakai data yang sudah ada */
       } finally {
         if (!cancelled) setRefreshing(false);
       }
-      if (!cancelled) await Promise.all([loadVolcanoes(), loadAirports()]);
     })();
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- sekali saat app dibuka
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- bootstrap sekali
   }, []);
 
   useEffect(() => {
@@ -99,7 +105,6 @@ export function MapShell() {
   }, [loadVolcanoes]);
 
   useEffect(() => {
-    loadAirports();
     const t = setInterval(loadAirports, 120_000);
     return () => clearInterval(t);
   }, [loadAirports]);

@@ -62,13 +62,20 @@ function markerEl(v: Volcano, selected: boolean) {
   return wrap;
 }
 
-/** Marker bandara — selalu ada ikon pesawat yang terlihat. */
+function planeSvg(fg: string, size: number) {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true" style="display:block">
+    <path fill="${fg}" d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5L21 16z"/>
+  </svg>`;
+}
+
+/** Marker bandara dengan ikon SVG (bukan emoji) agar selalu terlihat. */
 function airportEl(a: AirportStation, showLabel: boolean) {
   const kind = a.closed ? "closed" : a.has_va ? "va" : "open";
   const bg =
-    kind === "closed" ? "#ff1f4b" : kind === "va" ? "#e0b84a" : "#2dd4bf";
-  const fg = kind === "closed" ? "#fff" : "#041016";
-  const size = kind === "closed" ? 28 : kind === "va" ? 24 : 18;
+    kind === "closed" ? "#ff1f4b" : kind === "va" ? "#e0b84a" : "#14b8a6";
+  const fg = kind === "closed" ? "#ffffff" : "#041016";
+  const box = kind === "closed" ? 30 : kind === "va" ? 26 : 20;
+  const icon = kind === "open" ? 12 : 14;
 
   const wrap = document.createElement("button");
   wrap.type = "button";
@@ -77,7 +84,7 @@ function airportEl(a: AirportStation, showLabel: boolean) {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 2px;
+    gap: 3px;
     background: transparent;
     border: 0;
     cursor: pointer;
@@ -93,28 +100,24 @@ function airportEl(a: AirportStation, showLabel: boolean) {
     const label = document.createElement("span");
     label.className = "pe-marker-label";
     label.textContent =
-      kind === "closed" ? `${a.icao} ✕` : kind === "va" ? `${a.icao} VA` : a.icao;
+      kind === "closed" ? `${a.icao} TUTUP` : kind === "va" ? `${a.icao} VA` : a.icao;
     wrap.appendChild(label);
   }
 
   const pin = document.createElement("span");
   pin.style.cssText = `
-    width: ${size}px;
-    height: ${size}px;
-    border-radius: 5px;
+    width: ${box}px;
+    height: ${box}px;
+    border-radius: 6px;
     display: grid;
     place-items: center;
-    font-size: ${kind === "open" ? 11 : 13}px;
-    font-weight: 800;
-    line-height: 1;
-    color: ${fg};
     background: ${bg};
-    border: 2px solid rgba(255,255,255,0.55);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.45)${
-      kind === "closed" ? ", 0 0 0 5px rgba(255,31,75,0.35)" : ""
+    border: 2px solid #ffffff;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.55)${
+      kind === "closed" ? ", 0 0 0 4px rgba(255,31,75,0.4)" : ""
     };
   `;
-  pin.textContent = "✈";
+  pin.innerHTML = planeSvg(fg, icon);
   wrap.appendChild(pin);
   return wrap;
 }
@@ -166,17 +169,26 @@ export function VolcanoMap({
     mapRef.current = map;
 
     const markReady = () => {
+      map.resize();
       setMapReady(true);
       setLabelOpenAirports(map.getZoom() >= 5.8);
     };
     if (map.loaded()) markReady();
     else map.once("load", markReady);
 
+    // style.load bisa datang setelah load pertama
+    map.on("style.load", markReady);
+
     const onZoom = () => setLabelOpenAirports(map.getZoom() >= 5.8);
     map.on("zoomend", onZoom);
 
+    const onResize = () => map.resize();
+    window.addEventListener("resize", onResize);
+
     return () => {
+      window.removeEventListener("resize", onResize);
       map.off("zoomend", onZoom);
+      map.off("style.load", markReady);
       markersRef.current.forEach((m) => m.remove());
       airportMarkersRef.current.forEach((m) => m.remove());
       markersRef.current = [];
@@ -220,20 +232,13 @@ export function VolcanoMap({
 
     if (!showAirports || airports.length === 0) return;
 
-    // CLOSED/VA selalu berlabel; OPEN berlabel saat zoom dekat
     const ordered = [...airports].sort((a, b) => {
       const rank = (x: AirportStation) => (x.closed ? 2 : x.has_va ? 1 : 0);
       return rank(a) - rank(b);
     });
 
     for (const a of ordered) {
-      if (
-        !Number.isFinite(a.lat) ||
-        !Number.isFinite(a.lng) ||
-        (a.lat === 0 && a.lng === 0)
-      ) {
-        continue;
-      }
+      if (!Number.isFinite(a.lat) || !Number.isFinite(a.lng)) continue;
       const showLabel = a.closed || a.has_va || labelOpenAirports;
       const el = airportEl(a, showLabel);
       el.addEventListener("click", (e) => {
