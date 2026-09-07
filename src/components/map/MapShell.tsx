@@ -214,6 +214,7 @@ export function MapShell() {
               type="button"
               onClick={() => {
                 setSelected(null);
+                setFocusAirportIcao(null);
                 setShowAviation(true);
               }}
               className="flex shrink-0 items-center gap-2 rounded border border-[var(--ember)]/50 bg-[var(--panel)]/90 px-3 py-2 text-left backdrop-blur"
@@ -230,6 +231,7 @@ export function MapShell() {
               type="button"
               onClick={() => {
                 setSelected(null);
+                setFocusAirportIcao(null);
                 setShowAviation(true);
               }}
               className="flex shrink-0 items-center gap-2 rounded border border-[#2dd4bf]/40 bg-[var(--panel)]/90 px-3 py-2 backdrop-blur"
@@ -245,6 +247,7 @@ export function MapShell() {
               type="button"
               onClick={() => {
                 setSelected(null);
+                setFocusAirportIcao(null);
                 setShowAviation(true);
               }}
               className="flex shrink-0 items-center gap-2 rounded border border-[var(--sulfur)]/45 bg-[var(--panel)]/90 px-3 py-2 backdrop-blur"
@@ -260,6 +263,7 @@ export function MapShell() {
               type="button"
               onClick={() => {
                 setShowAviation(false);
+                setFocusAirportIcao(null);
                 setSelected(v);
               }}
               className="flex shrink-0 items-center gap-2 rounded border border-[var(--ember)]/35 bg-[var(--panel)]/90 px-3 py-2 text-left backdrop-blur transition hover:border-[var(--ember)]"
@@ -369,8 +373,13 @@ export function MapShell() {
         <AviationPanel
           airports={airports}
           reportTime={airportsReport}
-          onClose={() => setShowAviation(false)}
+          selectedIcao={focusAirportIcao}
+          onClose={() => {
+            setShowAviation(false);
+            setFocusAirportIcao(null);
+          }}
           onFocusAirport={(a) => setFocusAirportIcao(a.icao)}
+          onClearSelection={() => setFocusAirportIcao(null)}
         />
       )}
 
