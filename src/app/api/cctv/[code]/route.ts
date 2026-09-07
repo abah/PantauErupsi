@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { fetchMagmaCctvWithImages } from "@/lib/magma/cctv";
-import { magmaCode } from "@/lib/magma/vona";
-import { getVolcanoBySlug, getCctv } from "@/lib/store";
+import { hasMagmaCctv, magmaCode } from "@/lib/magma/vona";
+import { getVolcanoes } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
@@ -11,10 +11,24 @@ export async function GET(
 ) {
   const { code: raw } = await ctx.params;
   const code = magmaCode(raw);
+  const magmaUrl = `https://magma.esdm.go.id/v1/gunung-api/cctv/${code}`;
+
+  if (!hasMagmaCctv(code)) {
+    return NextResponse.json({
+      cameras: [],
+      magma_url: "https://magma.esdm.go.id/v1/gunung-api/cctv",
+      license:
+        "MAGMA Indonesia Web Camera/CCTV Images — CC BY-NC-ND 4.0 (PVMBG)",
+      embedded: false,
+      available: false,
+      note: `MAGMA belum mempublikasikan CCTV untuk kode ${code}. Snapshot live hanya tersedia untuk gunung di daftar CCTV resmi MAGMA.`,
+    });
+  }
 
   try {
     const cameras = await fetchMagmaCctvWithImages(code, 4);
-    if (cameras.length > 0) {
+    const withImages = cameras.filter((c) => c.image_data_url);
+    if (withImages.length > 0 || cameras.length > 0) {
       return NextResponse.json(
         {
           cameras: cameras.map((c) => ({
@@ -25,10 +39,11 @@ export async function GET(
             magma_path: `/v1/gunung-api/cctv/${code}`,
             has_image: Boolean(c.image_data_url),
           })),
-          magma_url: `https://magma.esdm.go.id/v1/gunung-api/cctv/${code}`,
+          magma_url: magmaUrl,
           license:
             "MAGMA Indonesia Web Camera/CCTV Images — CC BY-NC-ND 4.0 (PVMBG)",
-          embedded: true,
+          embedded: withImages.length > 0,
+          available: true,
         },
         {
           headers: {
@@ -38,24 +53,24 @@ export async function GET(
       );
     }
   } catch {
-    /* fallback local */
+    /* fall through */
   }
 
-  // Fallback: local store + deep link (tanpa redirect otomatis di UI)
-  const volcano =
-    (await getVolcanoBySlug(raw.toLowerCase())) ||
-    (await getVolcanoBySlug(code.toLowerCase()));
-  const local = volcano ? await getCctv(volcano.id) : await getCctv();
+  const volcanoes = await getVolcanoes();
+  const volcano = volcanoes.find(
+    (v) =>
+      v.code.toUpperCase() === raw.toUpperCase() ||
+      magmaCode(v.code) === code ||
+      v.slug === raw.toLowerCase(),
+  );
 
   return NextResponse.json({
-    cameras: local.map((c) => ({
-      ...c,
-      image_url: null,
-      has_image: false,
-    })),
-    magma_url: `https://magma.esdm.go.id/v1/gunung-api/cctv/${code}`,
+    cameras: [],
+    volcano_id: volcano?.id,
+    magma_url: magmaUrl,
     license: "MAGMA Indonesia Web Camera/CCTV Images — CC BY-NC-ND 4.0 (PVMBG)",
     embedded: false,
-    note: "Snapshot live tidak tersedia saat ini; tampilkan daftar kamera lokal.",
+    available: true,
+    note: "Halaman CCTV MAGMA ada, tetapi snapshot tidak berhasil diambil saat ini. Coba lagi sebentar.",
   });
 }

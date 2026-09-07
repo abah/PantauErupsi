@@ -21,18 +21,23 @@ export function CctvGallery({
   const [cameras, setCameras] = useState<Camera[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const [magmaUrl, setMagmaUrl] = useState(fallbackMagmaUrl);
   const [selected, setSelected] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setNote(null);
     fetch(`/api/cctv/${encodeURIComponent(code)}`)
       .then(async (r) => {
         const data = await r.json();
         if (!r.ok) throw new Error(data.error || "Gagal memuat CCTV");
         if (!cancelled) {
           setCameras(data.cameras ?? []);
+          setNote(data.note ?? null);
+          if (data.magma_url) setMagmaUrl(data.magma_url);
           setSelected(0);
         }
       })
@@ -89,12 +94,20 @@ export function CctvGallery({
           </div>
         </div>
       ) : (
-        <div className="flex h-36 items-center justify-center rounded border border-[var(--line)] bg-[var(--panel-2)] px-4 text-center text-sm text-[var(--muted)]">
-          Snapshot tidak tersedia untuk gunung ini saat ini.
+        <div className="rounded border border-[var(--line)] bg-[var(--panel-2)] px-4 py-5 text-center">
+          <p className="text-sm text-[var(--ink-soft)]">
+            {note ||
+              `Snapshot CCTV tidak tersedia untuk ${volcanoName || "gunung ini"}.`}
+          </p>
+          <p className="mt-2 text-[11px] text-[var(--muted)]">
+            Saat ini MAGMA mempublikasikan CCTV untuk: Anak Krakatau, Bromo,
+            Dempo, Dieng, Guntur, Ibu, Ijen, Kerinci, Papandayan, Semeru,
+            Sinabung.
+          </p>
         </div>
       )}
 
-      {cameras.length > 1 && (
+      {cameras.length > 1 && hasAnyImage && (
         <div className="flex flex-wrap gap-1.5">
           {cameras.map((cam, idx) => (
             <button
@@ -107,7 +120,7 @@ export function CctvGallery({
                   : "border border-[var(--line)] text-[var(--muted)] hover:text-[var(--ink)]"
               }`}
             >
-              {cam.label.replace(/^Anak Krakatau\s*-\s*/i, "").slice(0, 28) ||
+              {cam.label.replace(/^.*?\s*-\s*/i, "").slice(0, 28) ||
                 `Kamera ${idx + 1}`}
             </button>
           ))}
@@ -115,10 +128,9 @@ export function CctvGallery({
       )}
 
       <p className="text-[11px] leading-relaxed text-[var(--muted)]">
-        Gambar dari MAGMA Indonesia (PVMBG) — CC BY-NC-ND 4.0. Ditampilkan di
-        dalam PantauErupsi; sumber:{" "}
+        Gambar dari MAGMA Indonesia (PVMBG) — CC BY-NC-ND 4.0. Sumber:{" "}
         <a
-          href={fallbackMagmaUrl}
+          href={magmaUrl}
           target="_blank"
           rel="noreferrer"
           className="text-[var(--accent)] underline-offset-2 hover:underline"

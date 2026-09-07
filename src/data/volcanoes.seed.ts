@@ -1,6 +1,6 @@
 import type { ActivityLevel, Volcano } from "@/lib/types";
 import { ACTIVITY_LABELS } from "@/lib/types";
-import { magmaCode } from "@/lib/magma/vona";
+import { hasMagmaCctv, magmaCode } from "@/lib/magma/vona";
 
 type Seed = {
   name: string;
@@ -9,7 +9,7 @@ type Seed = {
   lat: number;
   lng: number;
   elevation_m?: number;
-  has_cctv?: boolean;
+  has_cctv?: boolean; // diabaikan; diganti daftar resmi MAGMA
 };
 
 const SEED: Seed[] = [
@@ -35,7 +35,7 @@ const SEED: Seed[] = [
   { name: "Gamalama", code: "GML", region: "Maluku Utara", lat: 0.8, lng: 127.33, elevation_m: 1715, has_cctv: true },
   { name: "Gamkonora", code: "GKO", region: "Maluku Utara", lat: 1.38, lng: 127.53, elevation_m: 1635 },
   { name: "Gede", code: "GED", region: "Jawa Barat", lat: -6.78, lng: 106.98, elevation_m: 2958, has_cctv: true },
-  { name: "Guntur", code: "GUN", region: "Jawa Barat", lat: -7.143, lng: 107.84, elevation_m: 2249 },
+  { name: "Guntur", code: "GUN", region: "Jawa Barat", lat: -7.143, lng: 107.84, elevation_m: 2249, has_cctv: true },
   { name: "Hobal", code: "HOB", region: "Nusa Tenggara Timur", lat: -6.66, lng: 123.83, elevation_m: 0 },
   { name: "Ibu", code: "IBU", region: "Maluku Utara", lat: 1.488, lng: 127.63, elevation_m: 1325, has_cctv: true },
   { name: "Ijen", code: "IJE", region: "Jawa Timur", lat: -8.058, lng: 114.242, elevation_m: 2799, has_cctv: true },
@@ -109,7 +109,7 @@ export function buildSeedVolcanoes(
       activity_label: ACTIVITY_LABELS[level],
       magma_url: `https://magma.esdm.go.id/v1/gunung-api/tingkat-aktivitas`,
       cctv_url: `https://magma.esdm.go.id/v1/gunung-api/cctv/${magmaCode(v.code)}`,
-      has_cctv: Boolean(v.has_cctv),
+      has_cctv: hasMagmaCctv(v.code),
     };
   });
 }

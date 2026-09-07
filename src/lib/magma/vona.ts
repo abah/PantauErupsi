@@ -6,13 +6,36 @@ const MAGMA = "https://magma.esdm.go.id";
 /** Mapping kode lokal → kode MAGMA VONA/CCTV jika berbeda. */
 export const MAGMA_CODE_ALIAS: Record<string, string> = {
   ANK: "KRA", // Anak Krakatau
+  SEM: "SMR", // Semeru
   GKO: "GMK", // Gamkonora
-  LEL: "LOB", // Lewotobi Laki-laki
+  LEL: "LOB", // Lewotobi Laki-laki (VONA; CCTV MAGMA belum tersedia)
 };
+
+/**
+ * Kode gunung yang memang punya halaman CCTV di MAGMA
+ * (https://magma.esdm.go.id/v1/gunung-api/cctv — diperbarui manual).
+ */
+export const MAGMA_CCTV_CODES = new Set([
+  "BRO", // Bromo
+  "DEM", // Dempo
+  "DIE", // Dieng
+  "GUN", // Guntur
+  "IBU", // Ibu
+  "IJE", // Ijen
+  "KER", // Kerinci
+  "KRA", // Anak Krakatau
+  "PAP", // Papandayan
+  "SIN", // Sinabung
+  "SMR", // Semeru
+]);
 
 export function magmaCode(code: string) {
   const upper = code.toUpperCase();
   return MAGMA_CODE_ALIAS[upper] ?? upper;
+}
+
+export function hasMagmaCctv(code: string) {
+  return MAGMA_CCTV_CODES.has(magmaCode(code));
 }
 
 function field(text: string, label: string): string | undefined {
