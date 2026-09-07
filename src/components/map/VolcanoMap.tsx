@@ -6,7 +6,12 @@ import {
   Marker,
   NavigationControl,
 } from "maplibre-gl";
-import type { Map, Marker as MarkerType } from "maplibre-gl";
+import type {
+  GeoJSONSource,
+  Map,
+  MapLayerMouseEvent,
+  Marker as MarkerType,
+} from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { ActivityLevel, AirportStation, Volcano } from "@/lib/types";
 import { ACTIVITY_COLORS } from "@/lib/types";
@@ -20,6 +25,10 @@ type Props = {
   onSelect: (v: Volcano) => void;
   onSelectAirport?: (a: AirportStation) => void;
 };
+
+const OPEN_SRC = "pe-airports-open";
+const OPEN_CIRCLE = "pe-airports-open-circle";
+const OPEN_LABEL = "pe-airports-open-label";
 
 function markerEl(v: Volcano, selected: boolean) {
   const level = v.activity_level as ActivityLevel;
@@ -62,8 +71,8 @@ function markerEl(v: Volcano, selected: boolean) {
   return wrap;
 }
 
-function airportEl(a: AirportStation, emphasize: boolean) {
-  const status = a.closed ? "CLOSED" : a.has_va ? "OPEN · VA" : "OPEN";
+function alertAirportEl(a: AirportStation) {
+  const isClosed = a.closed;
   const wrap = document.createElement("button");
   wrap.type = "button";
   wrap.className = "pe-airport-marker";
@@ -76,36 +85,107 @@ function airportEl(a: AirportStation, emphasize: boolean) {
     border: 0;
     cursor: pointer;
     padding: 0;
-    z-index: ${a.closed ? 5 : a.has_va ? 4 : 1};
   `;
-  wrap.setAttribute("aria-label", `${a.icao} ${a.name} ${status}`);
+  wrap.setAttribute(
+    "aria-label",
+    `${a.icao} ${a.name} ${isClosed ? "CLOSED" : "OPEN VA"}`,
+  );
 
-  if (emphasize) {
-    const label = document.createElement("span");
-    label.className = "pe-marker-label";
-    label.textContent = `${a.icao}${a.closed ? " ✕" : a.has_va ? " VA" : ""}`;
-    wrap.appendChild(label);
-  }
+  const label = document.createElement("span");
+  label.className = "pe-marker-label";
+  label.textContent = `${a.icao}${isClosed ? " ✕" : " VA"}`;
+  wrap.appendChild(label);
 
-  const size = a.closed ? 22 : a.has_va ? 18 : 10;
   const pin = document.createElement("span");
   pin.style.cssText = `
-    width: ${size}px;
-    height: ${size}px;
-    border-radius: ${a.closed || a.has_va ? "4px" : "50%"};
+    width: ${isClosed ? 24 : 20}px;
+    height: ${isClosed ? 24 : 20}px;
+    border-radius: 4px;
     display: grid;
     place-items: center;
-    font-size: ${a.closed || a.has_va ? "11px" : "0"};
+    font-size: 11px;
     font-weight: 800;
-    color: ${a.closed ? "#fff" : "#041016"};
-    background: ${a.closed ? "#ff1f4b" : a.has_va ? "#e0b84a" : "#2dd4bf"};
-    border: 1px solid rgba(255,255,255,${a.closed || a.has_va ? 0.4 : 0.2});
-    box-shadow: 0 0 0 ${a.closed ? 6 : 0}px rgba(255,31,75,0.35);
-    opacity: ${a.closed || a.has_va ? 1 : 0.75};
+    color: ${isClosed ? "#fff" : "#041016"};
+    background: ${isClosed ? "#ff1f4b" : "#e0b84a"};
+    border: 1px solid rgba(255,255,255,0.4);
+    box-shadow: 0 0 0 ${isClosed ? 6 : 0}px rgba(255,31,75,0.35);
   `;
-  pin.textContent = a.closed || a.has_va ? "✈" : "";
+  pin.textContent = "✈";
   wrap.appendChild(pin);
   return wrap;
+}
+
+function openAirportsGeoJSON(airports: AirportStation[]) {
+  return {
+    type: "FeatureCollection" as const,
+    features: airports
+      .filter((a) => !a.closed && !a.has_va)
+      .map((a) => ({
+        type: "Feature" as const,
+        properties: { icao: a.icao, name: a.name },
+        geometry: {
+          type: "Point" as const,
+          coordinates: [a.lng, a.lat],
+        },
+      })),
+  };
+}
+
+function clearOpenLayers(map: Map) {
+  if (map.getLayer(OPEN_LABEL)) map.removeLayer(OPEN_LABEL);
+  if (map.getLayer(OPEN_CIRCLE)) map.removeLayer(OPEN_CIRCLE);
+  if (map.getSource(OPEN_SRC)) map.removeSource(OPEN_SRC);
+}
+
+function upsertOpenLayers(map: Map, airports: AirportStation[]) {
+  const data = openAirportsGeoJSON(airports);
+  const existing = map.getSource(OPEN_SRC) as GeoJSONSource | undefined;
+  if (existing) {
+    existing.setData(data);
+    return;
+  }
+
+  map.addSource(OPEN_SRC, { type: "geojson", data });
+  map.addLayer({
+    id: OPEN_CIRCLE,
+    type: "circle",
+    source: OPEN_SRC,
+    paint: {
+      "circle-radius": [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        3,
+        4,
+        6,
+        7,
+        9,
+        10,
+      ],
+      "circle-color": "#2dd4bf",
+      "circle-opacity": 0.92,
+      "circle-stroke-width": 1.5,
+      "circle-stroke-color": "#041016",
+    },
+  });
+  map.addLayer({
+    id: OPEN_LABEL,
+    type: "symbol",
+    source: OPEN_SRC,
+    minzoom: 5.5,
+    layout: {
+      "text-field": ["get", "icao"],
+      "text-size": 10,
+      "text-offset": [0, 1.15],
+      "text-anchor": "top",
+      "text-allow-overlap": false,
+    },
+    paint: {
+      "text-color": "#5eead4",
+      "text-halo-color": "#07090d",
+      "text-halo-width": 1.25,
+    },
+  });
 }
 
 export function VolcanoMap({
@@ -121,8 +201,10 @@ export function VolcanoMap({
   const mapRef = useRef<Map | null>(null);
   const markersRef = useRef<MarkerType[]>([]);
   const airportMarkersRef = useRef<MarkerType[]>([]);
+  const airportsRef = useRef(airports);
   const onSelectRef = useRef(onSelect);
   const onAirportRef = useRef(onSelectAirport);
+  airportsRef.current = airports;
   onSelectRef.current = onSelect;
   onAirportRef.current = onSelectAirport;
 
@@ -150,7 +232,27 @@ export function VolcanoMap({
     map.addControl(new NavigationControl({ showCompass: false }), "bottom-right");
     mapRef.current = map;
 
+    const onOpenClick = (e: MapLayerMouseEvent) => {
+      const icao = e.features?.[0]?.properties?.icao as string | undefined;
+      if (!icao) return;
+      const a = airportsRef.current.find((x) => x.icao === icao);
+      if (a) onAirportRef.current?.(a);
+    };
+    const onEnter = () => {
+      map.getCanvas().style.cursor = "pointer";
+    };
+    const onLeave = () => {
+      map.getCanvas().style.cursor = "";
+    };
+
+    map.on("click", OPEN_CIRCLE, onOpenClick);
+    map.on("mouseenter", OPEN_CIRCLE, onEnter);
+    map.on("mouseleave", OPEN_CIRCLE, onLeave);
+
     return () => {
+      map.off("click", OPEN_CIRCLE, onOpenClick);
+      map.off("mouseenter", OPEN_CIRCLE, onEnter);
+      map.off("mouseleave", OPEN_CIRCLE, onLeave);
       markersRef.current.forEach((m) => m.remove());
       airportMarkersRef.current.forEach((m) => m.remove());
       markersRef.current = [];
@@ -191,26 +293,31 @@ export function VolcanoMap({
     airportMarkersRef.current.forEach((m) => m.remove());
     airportMarkersRef.current = [];
 
-    if (!showAirports) return;
+    const apply = () => {
+      if (!showAirports) {
+        clearOpenLayers(map);
+        return;
+      }
 
-    // Urut: OPEN dulu, lalu VA, CLOSED di atas (ditambahkan terakhir = paling depan)
-    const ordered = [...airports].sort((a, b) => {
-      const rank = (x: AirportStation) => (x.closed ? 2 : x.has_va ? 1 : 0);
-      return rank(a) - rank(b);
-    });
+      upsertOpenLayers(map, airports);
 
-    for (const a of ordered) {
-      const emphasize = a.closed || a.has_va;
-      const el = airportEl(a, emphasize);
-      el.addEventListener("click", (e) => {
-        e.stopPropagation();
-        onAirportRef.current?.(a);
-      });
-      const marker = new Marker({ element: el, anchor: "bottom" })
-        .setLngLat([a.lng, a.lat])
-        .addTo(map);
-      airportMarkersRef.current.push(marker);
-    }
+      // CLOSED + VA: marker HTML menonjol
+      const alerts = airports.filter((a) => a.closed || a.has_va);
+      for (const a of alerts) {
+        const el = alertAirportEl(a);
+        el.addEventListener("click", (e) => {
+          e.stopPropagation();
+          onAirportRef.current?.(a);
+        });
+        const marker = new Marker({ element: el, anchor: "bottom" })
+          .setLngLat([a.lng, a.lat])
+          .addTo(map);
+        airportMarkersRef.current.push(marker);
+      }
+    };
+
+    if (map.isStyleLoaded()) apply();
+    else map.once("load", apply);
   }, [airports, showAirports]);
 
   useEffect(() => {

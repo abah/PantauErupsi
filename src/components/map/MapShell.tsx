@@ -225,6 +225,21 @@ export function MapShell() {
               <span className="text-xs text-[var(--ember)]">BMKG</span>
             </button>
           )}
+          {filters.airports && airports.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setSelected(null);
+                setShowAviation(true);
+              }}
+              className="flex shrink-0 items-center gap-2 rounded border border-[#2dd4bf]/40 bg-[var(--panel)]/90 px-3 py-2 backdrop-blur"
+            >
+              <span className="h-2 w-2 rounded-full bg-[#2dd4bf]" />
+              <span className="text-sm font-semibold text-[#2dd4bf]">
+                {Math.max(0, airports.length - closedAirports.length)} OPEN
+              </span>
+            </button>
+          )}
           {vaAirports.length > 0 && (
             <button
               type="button"
