@@ -123,6 +123,12 @@ a {
   pointer-events: auto !important;
 }
 
+.pe-airport-label {
+  font-size: 9px;
+  padding: 1px 4px;
+  transform: translateY(0);
+}
+
 .maplibregl-marker {
   z-index: 2;
 }

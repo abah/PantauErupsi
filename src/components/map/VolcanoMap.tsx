@@ -68,14 +68,14 @@ function planeSvg(fg: string, size: number) {
   </svg>`;
 }
 
-/** Marker bandara dengan ikon SVG (bukan emoji) agar selalu terlihat. */
+/** Marker bandara dengan ikon SVG kecil — tidak mengalahkan marker gunung. */
 function airportEl(a: AirportStation, showLabel: boolean) {
   const kind = a.closed ? "closed" : a.has_va ? "va" : "open";
   const bg =
     kind === "closed" ? "#ff1f4b" : kind === "va" ? "#e0b84a" : "#14b8a6";
   const fg = kind === "closed" ? "#ffffff" : "#041016";
-  const box = kind === "closed" ? 30 : kind === "va" ? 26 : 20;
-  const icon = kind === "open" ? 12 : 14;
+  const box = kind === "closed" ? 16 : kind === "va" ? 14 : 10;
+  const icon = kind === "open" ? 7 : 9;
 
   const wrap = document.createElement("button");
   wrap.type = "button";
@@ -84,12 +84,12 @@ function airportEl(a: AirportStation, showLabel: boolean) {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 3px;
+    gap: 2px;
     background: transparent;
     border: 0;
     cursor: pointer;
     padding: 0;
-    z-index: ${kind === "closed" ? 6 : kind === "va" ? 5 : 3};
+    z-index: ${kind === "closed" ? 6 : kind === "va" ? 5 : 2};
   `;
   wrap.setAttribute(
     "aria-label",
@@ -98,7 +98,7 @@ function airportEl(a: AirportStation, showLabel: boolean) {
 
   if (showLabel) {
     const label = document.createElement("span");
-    label.className = "pe-marker-label";
+    label.className = "pe-marker-label pe-airport-label";
     label.textContent =
       kind === "closed" ? `${a.icao} TUTUP` : kind === "va" ? `${a.icao} VA` : a.icao;
     wrap.appendChild(label);
@@ -108,13 +108,13 @@ function airportEl(a: AirportStation, showLabel: boolean) {
   pin.style.cssText = `
     width: ${box}px;
     height: ${box}px;
-    border-radius: 6px;
+    border-radius: ${kind === "open" ? "50%" : "3px"};
     display: grid;
     place-items: center;
     background: ${bg};
-    border: 2px solid #ffffff;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.55)${
-      kind === "closed" ? ", 0 0 0 4px rgba(255,31,75,0.4)" : ""
+    border: 1px solid rgba(255,255,255,0.7);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4)${
+      kind === "closed" ? ", 0 0 0 3px rgba(255,31,75,0.3)" : ""
     };
   `;
   pin.innerHTML = planeSvg(fg, icon);
@@ -171,7 +171,7 @@ export function VolcanoMap({
     const markReady = () => {
       map.resize();
       setMapReady(true);
-      setLabelOpenAirports(map.getZoom() >= 5.8);
+      setLabelOpenAirports(map.getZoom() >= 6.5);
     };
     if (map.loaded()) markReady();
     else map.once("load", markReady);
@@ -179,7 +179,7 @@ export function VolcanoMap({
     // style.load bisa datang setelah load pertama
     map.on("style.load", markReady);
 
-    const onZoom = () => setLabelOpenAirports(map.getZoom() >= 5.8);
+    const onZoom = () => setLabelOpenAirports(map.getZoom() >= 6.5);
     map.on("zoomend", onZoom);
 
     const onResize = () => map.resize();
